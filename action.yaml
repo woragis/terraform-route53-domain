@@ -1,0 +1,98 @@
+name: 'Terraform Route53 Domain'
+description: 'Create or update a Route 53 record for a subdomain using Terraform'
+
+inputs:
+  project-name:
+    description: 'Project name used for tagging resources'
+    required: true
+
+  root-domain:
+    description: 'Root domain (e.g., example.com)'
+    required: true
+
+  terraform-dir:
+    description: 'Path to the Terraform module directory'
+    required: true
+
+  aws-region:
+    description: 'AWS region to use'
+    required: false
+    default: 'us-east-1'
+
+  environment:
+    description: 'Environment name for tagging'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: '1.5.0'
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Terraform Init
+      run: terraform init
+      shell: bash
+      working-directory: ${{ inputs.terraform-dir }}
+
+    - name: Get Hosted Zone ID
+      id: get_zone
+      run: |
+        HZ_ID=$(aws route53 list-hosted-zones-by-name \
+          --dns-name "${{ inputs.root-domain }}" \
+          --query "HostedZones[0].Id" \
+          --output text)
+
+        # Strip the "/hostedzone/" prefix
+        HZ_ID_CLEAN=${HZ_ID##*/}
+
+        echo "zone_id=$HZ_ID_CLEAN" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Terraform Import Hosted Zone
+      if: steps.get_zone.outputs.zone_id != ''
+      run: |
+        terraform import aws_route53_zone.primary ${{
+          steps.get_zone.outputs.zone_id
+        }}
+      shell: bash
+      working-directory: ${{ inputs.terraform-dir }}
+
+    - name: Terraform Plan
+      run: |
+        terraform plan \
+          -var "aws_region=${{ inputs.aws-region }}" \
+          -var "root_domain=${{ inputs.root-domain }}" \
+          -var "environment=${{ inputs.environment }}" \
+          -var "project_name=${{ inputs.project-name }}" \
+          -out=tfplan
+      shell: bash
+      working-directory: ${{ inputs.terraform-dir }}
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve tfplan
+      shell: bash
+      working-directory: ${{ inputs.terraform-dir }}
+
+    - name: Extract Terraform Outputs
+      id: get_outputs
+      run: |
+        echo "zone_id=$(terraform output -raw zone_id)" >> $GITHUB_OUTPUT
+      shell: bash
+      working-directory: ${{ inputs.terraform-dir }}
+
+outputs:
+  zone_id:
+    description: 'The ID of the created or imported Route 53 hosted zone'
+    value: ${{ steps.get_outputs.outputs.zone_id }}
