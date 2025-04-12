@@ -53,6 +53,7 @@ runs:
         HZ_ID_CLEAN=${HZ_ID##*/}
         echo "zone_id=$HZ_ID_CLEAN" >> $GITHUB_OUTPUT
       shell: bash
+      working-directory: ${{ inputs.terraform-dir }}
 
     - name: Terraform Import Hosted Zone
       if: steps.get_zone.outputs.zone_id != ''
