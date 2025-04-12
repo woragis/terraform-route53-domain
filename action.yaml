@@ -5,20 +5,16 @@ inputs:
   project-name:
     description: 'Project name used for tagging resources'
     required: true
-
   root-domain:
     description: 'Root domain (e.g., example.com)'
     required: true
-
   terraform-dir:
     description: 'Path to the Terraform module directory'
     required: true
-
   aws-region:
     description: 'AWS region to use'
     required: false
     default: 'us-east-1'
-
   environment:
     description: 'Environment name for tagging'
     required: true
@@ -54,18 +50,13 @@ runs:
           --query "HostedZones[0].Id" \
           --output text)
 
-        # Strip the "/hostedzone/" prefix
         HZ_ID_CLEAN=${HZ_ID##*/}
-
         echo "zone_id=$HZ_ID_CLEAN" >> $GITHUB_OUTPUT
       shell: bash
 
     - name: Terraform Import Hosted Zone
       if: steps.get_zone.outputs.zone_id != ''
-      run: |
-        terraform import aws_route53_zone.primary ${{
-          steps.get_zone.outputs.zone_id
-        }}
+      run: terraform import aws_route53_zone.primary ${{ steps.get_zone.outputs.zone_id }}
       shell: bash
       working-directory: ${{ inputs.terraform-dir }}
 
