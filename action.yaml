@@ -57,7 +57,7 @@ runs:
 
     - name: Terraform Import Hosted Zone
       if: steps.get_zone.outputs.zone_id != ''
-      run: terraform import module.route53_domain.aws_route53_zone.primary ${{ steps.get_zone.outputs.zone_id }}
+      run: terraform import aws_route53_zone.primary ${{ steps.get_zone.outputs.zone_id }}
       shell: bash
       working-directory: ${{ inputs.terraform-dir }}
 
